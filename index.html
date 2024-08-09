@@ -75,6 +75,7 @@
         <input type="file" id="fileInput" accept="image/*">
         <button id="startCamera">Start Camera</button>
         <button id="stopCamera" style="display:none;">Stop Camera</button>
+        <button id="switchCamera" style="display:none;">Switch Camera</button>
         <div id="scanner-container">
             <div id="scanline"></div>
         </div>
@@ -85,10 +86,12 @@
         let cameraStream = null;
         let hasPermission = false;
         let scanInterval = null;
+        let currentFacingMode = "environment"; // Default to back camera
 
         document.getElementById('fileInput').addEventListener('change', handleFileSelect);
         document.getElementById('startCamera').addEventListener('click', startCamera);
         document.getElementById('stopCamera').addEventListener('click', stopCamera);
+        document.getElementById('switchCamera').addEventListener('click', switchCamera);
 
         function handleFileSelect(e) {
             if (e.target.files && e.target.files.length > 0) {
@@ -113,7 +116,6 @@
                 }
                 scanline.style.top = `${position}px`;
                 
-                // Attempt to decode only when the scanline is visible
                 if (position % 30 === 0) {
                     Quagga.onProcessed((result) => {
                         if (result && result.boxes) {
@@ -139,7 +141,7 @@
         async function startCamera() {
             if (!hasPermission) {
                 try {
-                    await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
                     hasPermission = true;
                 } catch (err) {
                     console.error("Error getting camera permission:", err);
@@ -150,7 +152,7 @@
             if (!cameraStream) {
                 navigator.mediaDevices.getUserMedia({
                     video: {
-                        facingMode: "environment",
+                        facingMode: currentFacingMode,
                         width: { ideal: 1920 },
                         height: { ideal: 1080 },
                         aspectRatio: { ideal: 1.7777777778 },
@@ -164,6 +166,7 @@
                         startQuagga(stream);
                         document.getElementById('startCamera').style.display = 'none';
                         document.getElementById('stopCamera').style.display = 'inline-block';
+                        document.getElementById('switchCamera').style.display = 'inline-block';
                         showScanline();
                     })
                     .catch(function(err) {
@@ -173,6 +176,7 @@
                 startQuagga(cameraStream);
                 document.getElementById('startCamera').style.display = 'none';
                 document.getElementById('stopCamera').style.display = 'inline-block';
+                document.getElementById('switchCamera').style.display = 'inline-block';
                 showScanline();
             }
         }
@@ -189,8 +193,15 @@
             document.getElementById('scanner-container').innerHTML = '<div id="scanline"></div>';
             document.getElementById('startCamera').style.display = 'inline-block';
             document.getElementById('stopCamera').style.display = 'none';
+            document.getElementById('switchCamera').style.display = 'none';
             hideScanline();
             clearResult();
+        }
+
+        function switchCamera() {
+            currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+            stopCamera();
+            startCamera();
         }
 
         function startQuagga(stream) {
@@ -202,7 +213,7 @@
                     constraints: {
                         width: 1920,
                         height: 1080,
-                        facingMode: "environment",
+                        facingMode: currentFacingMode,
                         aspectRatio: 1.7777777778,
                         frameRate: 30,
                         focusMode: "continuous"
