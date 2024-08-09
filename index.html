@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode Scanner from Image or Camera</title>
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        #scanner-container {
+            width: 100%;
+            max-width: 640px;
+            height: 480px;
+            margin: 20px 0;
+            overflow: hidden;
+            position: relative;
+        }
+        #scanner-container img, #scanner-container video {
+            max-width: 50%;
+            max-height: 50%;
+            object-fit: contain;
+        }
+        #scanner-container canvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        input[type="file"], button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        #result {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Barcode Scanner</h1>
+        <input type="file" id="fileInput" accept="image/*">
+        <button id="startCamera">Start Camera</button>
+        <button id="stopCamera" style="display:none;">Stop Camera</button>
+        <div id="scanner-container"></div>
+        <div id="result"></div>
+    </div>
+    
+    <script>
+        let cameraStream = null;
+
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        document.getElementById('startCamera').addEventListener('click', startCamera);
+        document.getElementById('stopCamera').addEventListener('click', stopCamera);
+
+        function handleFileSelect(e) {
+            if (e.target.files && e.target.files.length > 0) {
+                var file = e.target.files[0];
+                var URL = window.URL || window.webkitURL;
+                var imageUrl = URL.createObjectURL(file);
+                
+                scanBarcode(imageUrl, "image");
+            }
+        }
+
+        function startCamera() {
+            if (!cameraStream) {
+                navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: "environment",
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                        frameRate: { ideal: 10, max: 20 }
+                    }
+                })
+                    .then(function(stream) {
+                        cameraStream = stream;
+                        startQuagga(stream);
+                        document.getElementById('startCamera').style.display = 'none';
+                        document.getElementById('stopCamera').style.display = 'inline-block';
+                    })
+                    .catch(function(err) {
+                        console.error("Error initializing camera:", err);
+                    });
+            } else {
+                startQuagga(cameraStream);
+                document.getElementById('startCamera').style.display = 'none';
+                document.getElementById('stopCamera').style.display = 'inline-block';
+            }
+        }
+
+        function stopCamera() {
+            Quagga.stop();
+            if (cameraStream) {
+                let tracks = cameraStream.getTracks();
+                tracks.forEach(function(track) {
+                    track.stop();
+                });
+                cameraStream = null;
+            }
+            document.getElementById('scanner-container').innerHTML = '';
+            document.getElementById('startCamera').style.display = 'inline-block';
+            document.getElementById('stopCamera').style.display = 'none';
+            clearResult(); // Clear the result when camera is stopped
+        }
+
+        function startQuagga(stream) {
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.getElementById('scanner-container'),
+                    constraints: {
+                        width: 1920,
+                        height: 1080,
+                        facingMode: "environment",
+                        frameRate: { ideal: 10, max: 20 }
+                    }
+                },
+                decoder: {
+                    readers: ["code_128_reader"]
+                }
+            }, function(err) {
+                if (err) {
+                    console.error("Error initializing Quagga:", err);
+                    return;
+                }
+                Quagga.start();
+            });
+
+            Quagga.onDetected(function(result) {
+                console.log("Barcode detected and processed : [" + result.codeResult.code + "]", result);
+                document.getElementById("result").textContent = "Scanned Code: " + result.codeResult.code;
+            });
+
+            // Add event listener for video blur event
+            const videoElement = document.querySelector('#scanner-container video');
+            videoElement.addEventListener('blur', clearResult);
+        }
+
+        function scanBarcode(imageUrl, type) {
+            Quagga.decodeSingle({
+                decoder: {
+                    readers: ["code_128_reader"]
+                },
+                locate: true,
+                src: imageUrl
+            }, function(result) {
+                if(result && result.codeResult) {
+                    document.getElementById("result").textContent = "Scanned Code: " + result.codeResult.code;
+                    console.log("Barcode detected and processed : [" + result.codeResult.code + "]", result);
+                } else {
+                    clearResult();
+                    console.log("Unable to read barcode");
+                }
+            });
+        }
+
+        function clearResult() {
+            document.getElementById("result").textContent = "";
+        }
+    </script>
+</body>
+</html>
