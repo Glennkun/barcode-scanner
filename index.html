@@ -3,266 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barcode Scanner from Image or Camera</title>
-    <script src="quagga.js"></script> <!-- Local quagga.min.js file -->
+    <title>Barcode Scanner with QuaggaJS</title>
+    <script src="serratus-quaggaJS-v0.12.1-14-g862df88/serratus-quaggaJS-862df88/dist/quagga.min.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-        }
-        .container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 90%;
-            width: 350px;
-        }
-        #scanner-container {
-            width: 300px;
-            height: 300px;
-            margin: 20px auto;
-            overflow: hidden;
+        #interactive {
             position: relative;
-        }
-        #scanner-container video {
             width: 100%;
             height: 100%;
-            object-fit: cover;
         }
-        #scanline {
-            position: absolute;
+
+        #video {
             width: 100%;
-            height: 2px;
-            background-color: red;
-            top: 0;
-            display: none;
+            height: auto;
         }
-        input[type="file"], button {
-            margin: 10px;
-            padding: 10px;
-            font-size: 16px;
-            width: calc(100% - 20px);
-            box-sizing: border-box;
+
+        #scanner-container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
         }
-        #result {
+
+        #output {
             margin-top: 20px;
-            font-weight: bold;
-            word-break: break-all;
-        }
-        @media (max-width: 600px) {
-            .container {
-                width: 95%;
-                padding: 10px;
-            }
-            #scanner-container {
-                width: 100%;
-                height: 250px;
-            }
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Barcode Scanner</h1>
-        <input type="file" id="fileInput" accept="image/*">
-        <button id="startCamera">Start Camera</button>
-        <button id="stopCamera" style="display:none;">Stop Camera</button>
-        <button id="switchCamera" style="display:none;">Switch Camera</button>
-        <div id="scanner-container">
-            <div id="scanline"></div>
+    <div id="scanner-container">
+        <div id="interactive" class="viewport">
+            <video id="video"></video>
         </div>
-        <div id="result"></div>
+        <div id="output">
+            <h2>Scanned Code:</h2>
+            <p id="result">None</p>
+        </div>
     </div>
-    
+
     <script>
-        let cameraStream = null;
-        let hasPermission = false;
-        let scanInterval = null;
-        let currentFacingMode = "environment"; // Default to back camera
-
-        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
-        document.getElementById('startCamera').addEventListener('click', startCamera);
-        document.getElementById('stopCamera').addEventListener('click', stopCamera);
-        document.getElementById('switchCamera').addEventListener('click', switchCamera);
-
-        function handleFileSelect(e) {
-            if (e.target.files && e.target.files.length > 0) {
-                var file = e.target.files[0];
-                var URL = window.URL || window.webkitURL;
-                var imageUrl = URL.createObjectURL(file);
-                
-                scanBarcode(imageUrl, "image");
-            }
-        }
-
-        function showScanline() {
-            const scanline = document.getElementById('scanline');
-            scanline.style.display = 'block';
-            let direction = 1;
-            let position = 0;
-
-            scanInterval = setInterval(() => {
-                position += direction * 2;
-                if (position >= 300 || position <= 0) {
-                    direction *= -1;
-                }
-                scanline.style.top = `${position}px`;
-                
-                if (position % 30 === 0) {
-                    Quagga.onProcessed((result) => {
-                        if (result && result.boxes) {
-                            const drawingCtx = Quagga.canvas.ctx.overlay;
-                            const drawingCanvas = Quagga.canvas.dom.overlay;
-
-                            drawingCtx.clearRect(0, 0, parseInt(drawingCanvas.getAttribute("width")), parseInt(drawingCanvas.getAttribute("height")));
-                            Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, { color: "blue", lineWidth: 2 });
-                        }
-                    });
-                }
-            }, 20);
-        }
-
-        function hideScanline() {
-            document.getElementById('scanline').style.display = 'none';
-            if (scanInterval) {
-                clearInterval(scanInterval);
-                scanInterval = null;
-            }
-        }
-
-        async function startCamera() {
-            if (!hasPermission) {
-                try {
-                    await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
-                    hasPermission = true;
-                } catch (err) {
-                    console.error("Error getting camera permission:", err);
-                    return;
-                }
-            }
-
-            if (!cameraStream) {
-                navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: currentFacingMode,
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                        aspectRatio: { ideal: 1.7777777778 },
-                        frameRate: { ideal: 30, max: 60 },
-                        focusMode: "continuous",
-                        resizeMode: "crop-and-scale"
-                    }
-                })
-                    .then(function(stream) {
-                        cameraStream = stream;
-                        startQuagga(stream);
-                        document.getElementById('startCamera').style.display = 'none';
-                        document.getElementById('stopCamera').style.display = 'inline-block';
-                        document.getElementById('switchCamera').style.display = 'inline-block';
-                        showScanline();
-                    })
-                    .catch(function(err) {
-                        console.error("Error initializing camera:", err);
-                    });
-            } else {
-                startQuagga(cameraStream);
-                document.getElementById('startCamera').style.display = 'none';
-                document.getElementById('stopCamera').style.display = 'inline-block';
-                document.getElementById('switchCamera').style.display = 'inline-block';
-                showScanline();
-            }
-        }
-
-        function stopCamera() {
-            Quagga.stop();
-            if (cameraStream) {
-                let tracks = cameraStream.getTracks();
-                tracks.forEach(function(track) {
-                    track.stop();
-                });
-                cameraStream = null;
-            }
-            document.getElementById('scanner-container').innerHTML = '<div id="scanline"></div>';
-            document.getElementById('startCamera').style.display = 'inline-block';
-            document.getElementById('stopCamera').style.display = 'none';
-            document.getElementById('switchCamera').style.display = 'none';
-            hideScanline();
-            clearResult();
-        }
-
-        function switchCamera() {
-            currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
-            stopCamera();
-            startCamera();
-        }
-
-        function startQuagga(stream) {
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.getElementById('scanner-container'),
-                    constraints: {
-                        width: 1920,
-                        height: 1080,
-                        facingMode: currentFacingMode,
-                        aspectRatio: 1.7777777778,
-                        frameRate: 30,
-                        focusMode: "continuous"
-                    }
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.querySelector('#interactive'),
+                constraints: {
+                    facingMode: "environment"
                 },
-                decoder: {
-                    readers: ["code_128_reader"]
-                },
-                locate: true
-            }, function(err) {
-                if (err) {
-                    console.error("Error initializing Quagga:", err);
-                    return;
-                }
-                Quagga.start();
-            });
-
-            Quagga.onDetected(function(result) {
-                console.log("Barcode detected and processed : [" + result.codeResult.code + "]", result);
-                document.getElementById("result").textContent = "Scanned Code: " + result.codeResult.code;
-            });
-
-            const videoElement = document.querySelector('#scanner-container video');
-            if (videoElement) {
-                videoElement.addEventListener('blur', clearResult);
+            },
+            decoder: {
+                readers: ["code_128_reader"]
+            },
+        }, function (err) {
+            if (err) {
+                console.log(err);
+                return;
             }
-        }
+            console.log("Initialization finished. Ready to start");
+            Quagga.start();
+        });
 
-        function scanBarcode(imageUrl, type) {
-            Quagga.decodeSingle({
-                decoder: {
-                    readers: ["code_128_reader"]
-                },
-                locate: true,
-                src: imageUrl
-            }, function(result) {
-                if(result && result.codeResult) {
-                    document.getElementById("result").textContent = "Scanned Code: " + result.codeResult.code;
-                    console.log("Barcode detected and processed : [" + result.codeResult.code + "]", result);
-                } else {
-                    clearResult();
-                    console.log("Unable to read barcode");
-                }
-            });
-        }
-
-        function clearResult() {
-            document.getElementById("result").textContent = "";
-        }
+        Quagga.onDetected(function (data) {
+            document.getElementById('result').innerText = data.codeResult.code;
+        });
     </script>
 </body>
 </html>
