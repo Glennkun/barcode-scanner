@@ -102,33 +102,33 @@
                 scanBarcode(imageUrl, "image");
             }
         }
-
         function showScanline() {
-            const scanline = document.getElementById('scanline');
-            scanline.style.display = 'block';
-            let direction = 1;
-            let position = 0;
+    const scanline = document.getElementById('scanline');
+    scanline.style.display = 'block';
+    let direction = 1;
+    let position = 0;
 
-            scanInterval = setInterval(() => {
-                position += direction * 2;
-                if (position >= 300 || position <= 0) {
-                    direction *= -1;
-                }
-                scanline.style.top = ${position}px;
-                
-                if (position % 30 === 0) {
-                    Quagga.onProcessed((result) => {
-                        if (result && result.boxes) {
-                            const drawingCtx = Quagga.canvas.ctx.overlay;
-                            const drawingCanvas = Quagga.canvas.dom.overlay;
-
-                            drawingCtx.clearRect(0, 0, parseInt(drawingCanvas.getAttribute("width")), parseInt(drawingCanvas.getAttribute("height")));
-                            Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, { color: "blue", lineWidth: 2 });
-                        }
-                    });
-                }
-            }, 20);
+    scanInterval = setInterval(() => {
+        position += direction * 2;
+        if (position >= 300 || position <= 0) {
+            direction *= -1;
         }
+        scanline.style.top = `${position}px`;  // Use backticks here
+        
+        if (position % 30 === 0) {
+            Quagga.onProcessed((result) => {
+                if (result && result.boxes) {
+                    const drawingCtx = Quagga.canvas.ctx.overlay;
+                    const drawingCanvas = Quagga.canvas.dom.overlay;
+
+                    drawingCtx.clearRect(0, 0, parseInt(drawingCanvas.getAttribute("width")), parseInt(drawingCanvas.getAttribute("height")));
+                    Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, { color: "blue", lineWidth: 2 });
+                }
+            });
+        }
+    }, 20);
+}
+
 
         function hideScanline() {
             document.getElementById('scanline').style.display = 'none';
